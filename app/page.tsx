@@ -1,0 +1,98 @@
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { extractPages } from "@/lib/pdf";
+
+const SUBJECTS = ["국어", "영어", "수학", "사회", "과학", "도덕", "실과", "미술", "음악", "체육", "통합교과", "창의적체험활동", "총론"];
+type Book = { id: string; title: string; subject: string; page_count: number | null };
+
+export default function Home() {
+  const [books, setBooks] = useState<Book[]>([]);
+  const [title, setTitle] = useState("");
+  const [subject, setSubject] = useState("국어");
+  const [file, setFile] = useState<File | null>(null);
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = () => fetch("/api/books").then((r) => r.json()).then((d) => Array.isArray(d) && setBooks(d));
+  useEffect(() => { load(); }, []);
+
+  async function upload() {
+    if (!file || !title.trim()) return;
+    setBusy(true);
+    try {
+      setStatus("교재 등록 중");
+      const r = await fetch("/api/books", { method: "POST", body: JSON.stringify({ title, subject }) });
+      const b = await r.json();
+      if (!r.ok) throw new Error(b.error);
+
+      setStatus("PDF 올리는 중");
+      const put = await fetch(b.uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": "application/pdf" } });
+      if (!put.ok) throw new Error(`PDF 업로드 실패 (${put.status})`);
+
+      const { pages, numPages } = await extractPages(file, (d, t) => setStatus(`본문 읽는 중 ${d}/${t}쪽`));
+      for (let i = 0; i < pages.length; i += 50) {
+        const pr = await fetch(`/api/books/${b.id}/pages`, {
+          method: "POST", body: JSON.stringify({ pages: pages.slice(i, i + 50), page_count: numPages }),
+        });
+        if (!pr.ok) throw new Error((await pr.json()).error);
+      }
+      const empty = pages.filter((p) => !p.text).length;
+      setStatus(empty > numPages / 2
+        ? `등록했어요. 다만 ${empty}쪽에 글자층이 없어요(스캔본). 이 쪽들은 표시할 때 내용을 직접 적어야 해요.`
+        : `등록했어요. ${numPages}쪽`);
+      setTitle(""); setFile(null); load();
+    } catch (e: any) {
+      setStatus(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function enablePush() {
+    try {
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
+      const raw = atob(key.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (key.length % 4)) % 4));
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true, applicationServerKey: Uint8Array.from(raw, (c) => c.charCodeAt(0)),
+      });
+      await fetch("/api/push/subscribe", { method: "POST", body: JSON.stringify(sub) });
+      setStatus("아침 알림을 켰어요.");
+    } catch {
+      setStatus("알림을 켜지 못했어요. 아이폰은 홈 화면에 추가한 뒤 그 앱에서 켜야 해요.");
+    }
+  }
+
+  return (
+    <>
+      <h1>교재</h1>
+      <ul className="list">
+        {books.map((b) => (
+          <li key={b.id}>
+            <div className="grow">
+              <Link href={`/book/${b.id}`}>{b.title}</Link>
+              <div className="muted">{b.subject}{b.page_count ? `, ${b.page_count}쪽` : ""}</div>
+            </div>
+          </li>
+        ))}
+        {!books.length && <li className="muted">교재 PDF를 올리면 여기서 열 수 있어요.</li>}
+      </ul>
+
+      <h2>교재 올리기</h2>
+      <label htmlFor="t">교재명</label>
+      <input id="t" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 국어 각론 1권" />
+      <label htmlFor="s">과목</label>
+      <select id="s" value={subject} onChange={(e) => setSubject(e.target.value)}>
+        {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
+      </select>
+      <label htmlFor="f">PDF</label>
+      <input id="f" type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+      <p style={{ display: "flex", gap: 8 }}>
+        <button onClick={upload} disabled={busy || !file || !title.trim()}>올리기</button>
+        <button className="ghost" onClick={enablePush}>아침 알림 켜기</button>
+      </p>
+      {status && <p className="muted" role="status">{status}</p>}
+    </>
+  );
+}
