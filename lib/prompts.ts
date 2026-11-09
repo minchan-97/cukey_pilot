@@ -31,7 +31,9 @@ export function stemPrompt(subject: string, concept: string, marked: string[], g
 export function answerPrompt(subject: string, stem: string, g: Grounding[]) {
   return (
     `너는 초등 임용 ${subject} 해설 보조자다.\n` +
-    `아래 근거 자료에만 기대어 이 문제의 모범답안과 해설을 쓴다. 근거 밖 내용을 지어내지 말 것.\n` +
+    `아래 근거 자료에만 기대어 이 문제의 모범답안과 해설을 쓴다.\n` +
+    `근거에 나오지 않는 예시·용어·분류를 덧붙이지 말 것(일반 상식으로 채우지 말 것). 근거의 표현을 되도록 그대로 쓴다.\n` +
+    `근거만으로 답할 수 없으면 model_answer에 "근거 부족"이라고만 쓴다.\n` +
     `해설 문장마다 기댄 근거를 [p12]처럼 표시하고, cites에 쓴 id를 모두 넣는다.\n\n` +
     `[문제]\n${stem}\n\n[근거 자료]\n${grounds(g)}\n\n` +
     `출력(JSON): {"model_answer": "모범답안", "explanation": "해설", "cites": ["p12"]}`
