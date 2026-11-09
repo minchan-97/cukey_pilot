@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadPdfjs } from "@/lib/pdf";
+import { cleanText } from "@/lib/clean";
 
 type Rect = { x: number; y: number; w: number; h: number };          // 쪽 크기 대비 0~1
 type Item = Rect & { str: string };
@@ -104,7 +105,7 @@ export default function PdfMarker({ bookId, fileUrl, initialPage = 1 }: { bookId
     const r = norm(start, pt(e)); setStart(null);
     if (r.w < 0.01 || r.h < 0.005) { setDraft(null); return; }
     setDraft(r);
-    const t = textIn(r, items);
+    const t = cleanText(textIn(r, items));
     setDraftText(t);
     setMsg(t ? "" : "이 영역에서 글자를 못 읽었어요(그림·스캔). 어떤 내용인지 직접 적어 주세요.");
   }
