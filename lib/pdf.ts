@@ -1,10 +1,8 @@
 // 브라우저 전용. 구형 iOS 사파리까지 고려해 legacy 빌드를 쓴다.
 export async function loadPdfjs(): Promise<any> {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
-    import.meta.url
-  ).toString();
+  // 워커는 번들링하지 않고 public에 복사된 파일을 쓴다(package.json postinstall)
+  pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
   return pdfjs;
 }
 
