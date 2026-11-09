@@ -46,9 +46,15 @@ export async function extractPages(file: File, onProgress?: Progress) {
     for (let n = queue.shift(); n !== undefined; n = queue.shift()) {
       try {
         const image = await pageImage(await doc.getPage(n));
-        const r = await fetch("/api/ocr", { method: "POST", body: JSON.stringify({ image, mode: "page" }) });
-        const d = await r.json();
-        if (r.ok && d.text) pages[n - 1].text = d.text; else failed++;
+        let text = "";
+        for (let tryNo = 0; tryNo < 2 && !text; tryNo++) {     // 시간 초과 등으로 실패하면 한 번 더
+          try {
+            const r = await fetch("/api/ocr", { method: "POST", body: JSON.stringify({ image, mode: "page" }) });
+            const d = await r.json();
+            if (r.ok && d.text) text = d.text;
+          } catch { /* 다음 시도 */ }
+        }
+        if (text) pages[n - 1].text = text; else failed++;
       } catch { failed++; }
       onProgress?.(`글자가 깨진 쪽을 이미지로 읽는 중 ${++done}/${redo.length}쪽`);
     }
