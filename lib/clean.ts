@@ -65,3 +65,29 @@ export function cleanText(s: unknown): string {
     .replace(/ +\n/g, "\n")
     .trim();
 }
+
+// ── 되돌릴 수 없게 깨진 글자 알아보기 ─────────────────────────
+// 글꼴마다 깨지는 방식이 달라서(수학 교재처럼 멀쩡한 한글 음절로 뒤섞이는 경우)
+// 규칙으로 되돌릴 수 없는 것도 있다. 그런 글은 이미지로 다시 읽어야 한다.
+// 판정: 정상 한국어 글에는 '이·다·는·의·을…' 같은 흔한 음절이 절반 가까이 섞이는데,
+// 뒤섞인 글에는 거의 없고 엉뚱한 한자가 끼어 있다.
+const COMMON = new Set("이다는의을를에하고가서한적수와로은지기인과리사도들게것있해대으장시상자정부어나일라전여면그되요화성할국문학습생활동교육용".split(""));
+const NORMAL_SYMBOL = (c: number) =>
+  (c >= 0x2460 && c <= 0x24FF) || (c >= 0x3000 && c <= 0x303F) || (c >= 0x3130 && c <= 0x318F) ||
+  (c >= 0x3200 && c <= 0x32FF) || (c >= 0x2010 && c <= 0x2027) || (c >= 0xFF00 && c <= 0xFFEF);
+
+export function looksBroken(text: string): boolean {
+  const chars = [...text.replace(/\s/g, "")];
+  if (chars.length < 8) return false;
+  const hangul = chars.filter((ch) => isHangul(ch.codePointAt(0)!));
+  if (hangul.length >= 8) {
+    const common = hangul.filter((ch) => COMMON.has(ch)).length / hangul.length;
+    const han = chars.filter((ch) => /[\u4E00-\u9FFF]/.test(ch)).length / hangul.length;
+    if (common < 0.25 || han > 0.1) return true;
+  }
+  const odd = chars.filter((ch) => {
+    const c = ch.codePointAt(0)!;
+    return c > 0x2000 && !isHangul(c) && !NORMAL_SYMBOL(c);
+  }).length;
+  return odd / chars.length > 0.3;
+}
