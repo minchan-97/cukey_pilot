@@ -15,7 +15,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); }
 body {
-  font-family: var(--font-sans), "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-family: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   font-size: 16px; line-height: 1.6;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -71,11 +71,11 @@ label { display: block; font-size: 14px; color: var(--muted); margin: 10px 0 4px
 
 /* 문제: 시험지처럼 */
 .stem {
-  font-family: var(--font-serif), serif; font-size: 17px; line-height: 1.85;
+  font-family: "Noto Serif KR", serif; font-size: 17px; line-height: 1.85;
   background: var(--paper); border: 1px solid var(--line); border-left: 3px solid var(--ink);
   padding: 16px 18px; white-space: pre-wrap;
 }
-.serif { font-family: var(--font-serif), serif; line-height: 1.85; white-space: pre-wrap; }
+.serif { font-family: "Noto Serif KR", serif; line-height: 1.85; white-space: pre-wrap; }
 .ground { border-left: 3px solid var(--marker-edge); padding: 4px 12px; margin: 10px 0; font-size: 14px; }
 .ground a { font-weight: 500; }
 .verdict { display: flex; gap: 8px; margin-top: 10px; }
