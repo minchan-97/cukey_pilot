@@ -42,6 +42,7 @@ export default function PdfMarker({ bookId, fileUrl, initialPage = 1 }: { bookId
   const [draftText, setDraftText] = useState("");
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [reading, setReading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -107,7 +108,27 @@ export default function PdfMarker({ bookId, fileUrl, initialPage = 1 }: { bookId
     setDraft(r);
     const t = cleanText(textIn(r, items));
     setDraftText(t);
-    setMsg(t ? "" : "이 영역에서 글자를 못 읽었어요(그림·스캔). 어떤 내용인지 직접 적어 주세요.");
+    setMsg("");
+    if (!t) readImage(r); // 글자층이 없으면(스캔·그림) 바로 이미지로 읽기
+  }
+
+  /** 화면에 그려진 쪽에서 표시 영역만 잘라 이미지로 읽는다 */
+  async function readImage(r: Rect | null = draft) {
+    const c = canvas.current;
+    if (!r || !c) return;
+    const pad = 0.01;
+    const x = Math.max(0, r.x - pad) * c.width, y = Math.max(0, r.y - pad) * c.height;
+    const w = Math.min(1, r.w + pad * 2) * c.width, h = Math.min(1, r.h + pad * 2) * c.height;
+    const crop = document.createElement("canvas");
+    const scale = Math.min(1, 1600 / Math.max(w, h));
+    crop.width = Math.round(w * scale); crop.height = Math.round(h * scale);
+    crop.getContext("2d")!.drawImage(c, x, y, w, h, 0, 0, crop.width, crop.height);
+    setReading(true); setMsg("이미지로 읽는 중");
+    const res = await fetch("/api/ocr", { method: "POST", body: JSON.stringify({ image: crop.toDataURL("image/jpeg", 0.9) }) });
+    const d = await res.json();
+    setReading(false);
+    if (!res.ok) { setMsg(`${d.error} 내용을 직접 적어 주세요.`); return; }
+    setDraftText(d.text); setMsg("이미지에서 읽었어요. 틀린 글자가 있으면 고쳐 주세요.");
   }
 
   async function save() {
@@ -155,8 +176,9 @@ export default function PdfMarker({ bookId, fileUrl, initialPage = 1 }: { bookId
         <div className="sheetbar">
           <label htmlFor="dt">표시한 내용</label>
           <textarea id="dt" value={draftText} onChange={(e) => setDraftText(e.target.value)} style={{ minHeight: 80 }} />
-          <p style={{ display: "flex", gap: 8, margin: "10px 0 0" }}>
-            <button onClick={save} disabled={saving || !draftText.trim()}>{saving ? "저장 중" : "약한 개념에 쌓기"}</button>
+          <p style={{ display: "flex", gap: 8, margin: "10px 0 0", flexWrap: "wrap" }}>
+            <button onClick={save} disabled={saving || reading || !draftText.trim()}>{saving ? "저장 중" : "약한 개념에 쌓기"}</button>
+            <button className="ghost" onClick={() => readImage()} disabled={reading}>{reading ? "읽는 중" : "글자가 이상해요"}</button>
             <button className="ghost" onClick={() => setDraft(null)}>취소</button>
           </p>
         </div>
