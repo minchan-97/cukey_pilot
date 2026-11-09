@@ -18,5 +18,5 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   // cron은 자체 비밀값으로, 서비스워커·매니페스트는 인증 없이 받아야 함
-  matcher: ["/((?!api/cron|sw.js|manifest.webmanifest|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/cron|sw.js|pdf.worker.min.mjs|manifest.webmanifest|_next/static|_next/image|favicon.ico).*)"],
 };
