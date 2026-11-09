@@ -30,17 +30,16 @@ export default function Home() {
       const put = await fetch(b.uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": "application/pdf" } });
       if (!put.ok) throw new Error(`PDF 업로드 실패 (${put.status})`);
 
-      const { pages, numPages } = await extractPages(file, (d, t) => setStatus(`본문 읽는 중 ${d}/${t}쪽`));
+      const { pages, numPages, reread, failed } = await extractPages(file, setStatus);
       for (let i = 0; i < pages.length; i += 50) {
         const pr = await fetch(`/api/books/${b.id}/pages`, {
           method: "POST", body: JSON.stringify({ pages: pages.slice(i, i + 50), page_count: numPages }),
         });
         if (!pr.ok) throw new Error((await pr.json()).error);
       }
-      const empty = pages.filter((p) => !p.text).length;
-      setStatus(empty > numPages / 2
-        ? `등록했어요. 다만 ${empty}쪽에 글자층이 없어요(스캔본). 이 쪽들은 표시할 때 내용을 직접 적어야 해요.`
-        : `등록했어요. ${numPages}쪽`);
+      setStatus(`등록했어요. ${numPages}쪽` +
+        (reread ? ` 중 ${reread}쪽은 글자가 깨져 이미지로 읽었어요.` : "") +
+        (failed ? ` ${failed}쪽은 읽지 못해서, 표시할 때 내용을 직접 적어야 해요.` : ""));
       setTitle(""); setFile(null); load();
     } catch (e: any) {
       setStatus(e.message);
