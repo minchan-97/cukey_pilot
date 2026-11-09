@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadPdfjs } from "@/lib/pdf";
-import { cleanText } from "@/lib/clean";
+import { cleanText, looksBroken } from "@/lib/clean";
 
 type Rect = { x: number; y: number; w: number; h: number };          // 쪽 크기 대비 0~1
 type Item = Rect & { str: string };
@@ -109,7 +109,7 @@ export default function PdfMarker({ bookId, fileUrl, initialPage = 1 }: { bookId
     const t = cleanText(textIn(r, items));
     setDraftText(t);
     setMsg("");
-    if (!t) readImage(r); // 글자층이 없으면(스캔·그림) 바로 이미지로 읽기
+    if (!t || looksBroken(t)) readImage(r); // 글자층이 없거나 깨졌으면 바로 이미지로 읽기
   }
 
   /** 화면에 그려진 쪽에서 표시 영역만 잘라 이미지로 읽는다 */
