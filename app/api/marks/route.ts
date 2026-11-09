@@ -1,6 +1,7 @@
 import { db, userId, json, fail } from "@/lib/db";
 import { llmJSON } from "@/lib/llm";
 import { conceptPrompt, normName } from "@/lib/prompts";
+import { cleanText } from "@/lib/clean";
 
 export async function GET(req: Request) {
   const u = new URL(req.url);
@@ -16,7 +17,9 @@ export async function GET(req: Request) {
 
 // 드래그 표시 저장 → 개념 이름 붙이기(기존 이름 재사용 우선) → 약한 개념에 쌓기
 export async function POST(req: Request) {
-  const { book_id, page_no, rects, text } = await req.json();
+  const body = await req.json();
+  const { book_id, page_no, rects } = body;
+  const text = cleanText(body.text);
   if (!text?.trim()) return fail("표시한 부분의 내용이 비어 있어요. 직접 적어 주세요.");
   const sb = db();
   const user = userId();
