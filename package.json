@@ -1,7 +1,12 @@
 {
   "name": "imyong-d",
   "private": true,
-  "scripts": { "dev": "next dev", "build": "next build", "start": "next start" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "postinstall": "cp node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs public/pdf.worker.min.mjs"
+  },
   "dependencies": {
     "@supabase/supabase-js": "2.45.4",
     "next": "14.2.15",
