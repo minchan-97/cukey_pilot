@@ -1,7 +1,7 @@
 import { db, userId, json, fail } from "@/lib/db";
 import { llmJSON } from "@/lib/llm";
 import { answerPrompt, gradePrompt } from "@/lib/prompts";
-import { checkCites } from "@/lib/guard";
+import { checkCites, checkSupport } from "@/lib/guard";
 import type { Grounding } from "@/lib/retrieve";
 
 // 내 답을 내야만 해설이 열린다(인출연습 강제). 해설 생성 → 채점 '제안'까지.
@@ -22,9 +22,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     for (let i = 0; i < 2 && !answer; i++) {
       const r = await llmJSON<any>(answerPrompt(subject, p.stem, grounding), 0.2);
       const chk = checkCites(r.cites, grounding);
-      if (chk.ok && r.model_answer) answer = { model_answer: r.model_answer, explanation: r.explanation ?? "", cites: chk.cites };
+      const sup = checkSupport(`${r.model_answer ?? ""} ${r.explanation ?? ""}`, grounding);
+      if (chk.ok && sup.ok && r.model_answer) answer = { model_answer: r.model_answer, explanation: r.explanation ?? "", cites: chk.cites };
     }
-    if (!answer) return fail("근거 안에서 해설을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.", 422);
+    if (!answer) return fail("근거에 없는 내용이 섞여 해설을 내지 않았어요. 다시 눌러 보고, 계속 안 되면 새 문제를 만들어 주세요.", 422);
     await sb.from("problems").update({ answer, revealed_at: new Date().toISOString() }).eq("id", p.id);
   }
 
