@@ -2,7 +2,8 @@ import { json, fail } from "@/lib/db";
 import { cleanText } from "@/lib/clean";
 
 // 글자층이 깨졌거나(글꼴 대응표 손상) 없을 때(스캔본) 이미지를 보고 글자를 읽는다. v17 page_scan 원칙 그대로.
-export const maxDuration = 60;
+// 글자가 빽빽한 쪽은 옮겨 적는 데만 1분 넘게 걸린다
+export const maxDuration = 300;
 
 const RULES =
   "요약·설명 금지. 적힌 글자를 그대로, 읽는 순서대로 옮긴다. 2단 편집은 왼쪽 단 다음 오른쪽 단.\n" +
