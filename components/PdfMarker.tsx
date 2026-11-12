@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { loadPdfjs } from "@/lib/pdf";
+import { loadPdfjs, ocrRegion } from "@/lib/pdf";
 import { cleanText, looksBroken } from "@/lib/clean";
 
 type Rect = { x: number; y: number; w: number; h: number };          // 쪽 크기 대비 0~1
@@ -125,23 +125,17 @@ export default function PdfMarker({ bookId, fileUrl, initialPage = 1 }: { bookId
     if (!t || looksBroken(t)) readImage(r); // 글자층이 없거나 깨졌으면 바로 이미지로 읽기
   }
 
-  /** 화면에 그려진 쪽에서 표시 영역만 잘라 이미지로 읽는다 */
+  /** 표시 영역을 원본 PDF에서 크게 다시 그려 이미지로 읽는다 */
   async function readImage(r: Rect | null = draft) {
-    const c = canvas.current;
-    if (!r || !c) return;
-    const pad = 0.01;
-    const x = Math.max(0, r.x - pad) * c.width, y = Math.max(0, r.y - pad) * c.height;
-    const w = Math.min(1, r.w + pad * 2) * c.width, h = Math.min(1, r.h + pad * 2) * c.height;
-    const crop = document.createElement("canvas");
-    const scale = Math.min(1, 1600 / Math.max(w, h));
-    crop.width = Math.round(w * scale); crop.height = Math.round(h * scale);
-    crop.getContext("2d")!.drawImage(c, x, y, w, h, 0, 0, crop.width, crop.height);
+    if (!r || !doc) return;
     setReading(true); setMsg("이미지로 읽는 중");
-    const res = await fetch("/api/ocr", { method: "POST", body: JSON.stringify({ image: crop.toDataURL("image/jpeg", 0.9) }) });
-    const d = await res.json();
-    setReading(false);
-    if (!res.ok) { setMsg(`${d.error} 내용을 직접 적어 주세요.`); return; }
-    setDraftText(d.text); setMsg("이미지에서 읽었어요. 틀린 글자가 있으면 고쳐 주세요.");
+    try {
+      const text = await ocrRegion(await doc.getPage(pageNo), r, "region");
+      if (!text) { setMsg("이미지에서 글자를 읽지 못했어요. 내용을 직접 적어 주세요."); return; }
+      setDraftText(text); setMsg("이미지에서 읽었어요. 틀린 글자가 있으면 고쳐 주세요.");
+    } finally {
+      setReading(false);
+    }
   }
 
   async function save() {
