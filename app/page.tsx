@@ -20,15 +20,23 @@ export default function Home() {
   async function upload() {
     if (!file || !title.trim()) return;
     setBusy(true);
+    let bookId = "";
     try {
       setStatus("교재 등록 중");
       const r = await fetch("/api/books", { method: "POST", body: JSON.stringify({ title, subject }) });
       const b = await r.json();
       if (!r.ok) throw new Error(b.error);
+      bookId = b.id;
 
       setStatus("PDF 올리는 중");
-      const put = await fetch(b.uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": "application/pdf" } });
-      if (!put.ok) throw new Error(`PDF 업로드 실패 (${put.status})`);
+      // Supabase 공식 클라이언트와 같은 방식(FormData)으로 올린다
+      const form = new FormData();
+      form.append("cacheControl", "3600");
+      form.append("", file);
+      const put = await fetch(b.uploadUrl, { method: "PUT", body: form, headers: { "x-upsert": "true" } });
+      if (!put.ok) throw new Error(`PDF 업로드 실패 (${put.status}) ${(await put.text()).slice(0, 120)}`);
+      const chk = await fetch(`/api/books/${b.id}?check=1`).then((x) => x.json());
+      if (!chk.exists) throw new Error("PDF가 저장소에 저장되지 않았어요. 다시 시도해 주세요.");
 
       const { pages, numPages, reread, failed } = await extractPages(file, setStatus);
       for (let i = 0; i < pages.length; i += 50) {
@@ -42,10 +50,19 @@ export default function Home() {
         (failed ? ` ${failed}쪽은 읽지 못해서, 표시할 때 내용을 직접 적어야 해요.` : ""));
       setTitle(""); setFile(null); load();
     } catch (e: any) {
+      // 반쪽짜리 교재가 목록에 남지 않게 지운다
+      if (bookId) await fetch(`/api/books/${bookId}`, { method: "DELETE" }).catch(() => {});
       setStatus(e.message);
+      load();
     } finally {
       setBusy(false);
     }
+  }
+
+  async function removeBook(id: string, name: string) {
+    if (!window.confirm(`'${name}'을(를) 지울까요? 표시한 내용과 약한 개념도 함께 지워져요.`)) return;
+    await fetch(`/api/books/${id}`, { method: "DELETE" });
+    load();
   }
 
   async function enablePush() {
@@ -73,6 +90,7 @@ export default function Home() {
               <Link href={`/book/${b.id}`}>{b.title}</Link>
               <div className="muted">{b.subject}{b.page_count ? `, ${b.page_count}쪽` : ""}</div>
             </div>
+            <button className="ghost" onClick={() => removeBook(b.id, b.title)}>지우기</button>
           </li>
         ))}
         {!books.length && <li className="muted">교재 PDF를 올리면 여기서 열 수 있어요.</li>}
