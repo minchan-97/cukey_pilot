@@ -46,10 +46,23 @@ export default function PdfMarker({ bookId, fileUrl, initialPage = 1 }: { bookId
 
   useEffect(() => {
     let alive = true;
-    loadPdfjs().then(async (lib) => {
-      const d = await lib.getDocument({ url: fileUrl }).promise;
-      if (alive) { setPdfjs(lib); setDoc(d); }
-    }).catch(() => setMsg("교재를 열지 못했어요. 새로고침해 주세요."));
+    (async () => {
+      try {
+        const lib = await loadPdfjs();
+        // 주소를 pdf.js에 바로 넘기지 않고 직접 받아서 연다(부분 요청·CORS 문제 회피, 원인 표시)
+        const res = await fetch(fileUrl);
+        if (!res.ok) {
+          throw new Error(res.status === 400 || res.status === 404
+            ? `저장소에 PDF 파일이 없어요(${res.status}). 교재를 다시 올려 주세요.`
+            : `PDF 파일을 받지 못했어요(${res.status}).`);
+        }
+        const data = new Uint8Array(await res.arrayBuffer());
+        const d = await lib.getDocument({ data }).promise;
+        if (alive) { setPdfjs(lib); setDoc(d); }
+      } catch (e: any) {
+        if (alive) setMsg(`교재를 열지 못했어요: ${e?.message ?? e}`);
+      }
+    })();
     return () => { alive = false; };
   }, [fileUrl]);
 
