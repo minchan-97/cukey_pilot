@@ -4,6 +4,7 @@ import { gatherGrounding, type Grounding } from "@/lib/retrieve";
 import { blankPrompt, casePrompt } from "@/lib/prompts";
 import { checkCites, checkSupport, readable } from "@/lib/guard";
 import { cleanText } from "@/lib/clean";
+import { blankCandidates } from "@/lib/blanks";
 
 const SYMBOLS = ["㉠", "㉡", "㉢", "㉣"];
 const squash = (s: string) => s.replace(/[\s·.,'"‘’“”()<>]/g, "");
@@ -20,24 +21,41 @@ type Built = { stem: string; answer: { model_answer: string; explanation: string
 
 // ── 빈칸형: 제시문 = 드래그한 원문 그대로, 빈칸은 코드가 직접 뚫는다
 async function buildBlank(subject: string, concept: string, passage: string, g: Grounding[]): Promise<Built | null> {
-  const r = await llmJSON<any>(blankPrompt(subject, concept, passage, g), 0.3);
+  const cands = blankCandidates(passage, concept, g.map((x) => x.text).join("\n")).map((c) => c.term);
+  if (cands.length < 1) return null;
+  const r = await llmJSON<any>(blankPrompt(subject, concept, passage, cands, g), 0.3);
+  const sentences = passage.split(/(?<=[.?!다])\s+/);
+  const maxBlanks = sentences.length >= 3 ? 3 : 2;
   const answers: string[] = (r.blanks ?? []).map((b: any) => String(b?.answer ?? "").trim())
-    .filter((a: string) => a.length >= 2 && a.length <= 20).slice(0, 3);
+    .filter((a: string) => cands.includes(a))                       // 후보 밖의 말은 버린다
+    .filter((a: string, k: number, arr: string[]) => arr.indexOf(a) === k)
+    .sort((a: string, b: string) => passage.indexOf(a) - passage.indexOf(b));  // 제시문 순서대로 ㉠, ㉡
   if (!answers.length) return null;
   const cites = checkCites(r.cites, g);
   if (!cites.ok) return null;
 
-  // 원문에서 순서대로 찾아 ( ㉠ )로 바꾼다. 못 찾거나 겹치면 실패
+  // 원문에서 순서대로 찾아 ( ㉠ )로 바꾼다. 못 찾거나, 한 문장에 둘이 몰리면 실패
   let text = passage, from = 0;
-  const used: string[] = [];
-  for (const [i, a] of answers.entries()) {
-    const at = text.indexOf(a, from);
-    if (at < 0) return null;
-    const mark = `( ${SYMBOLS[i]} )`;
-    text = text.slice(0, at) + mark + text.slice(at + a.length);
-    from = at + mark.length;
-    used.push(a);
+  const used: string[] = [], sentOf: number[] = [];
+  const sentenceAt = (pos: number) => {
+    let acc = 0;
+    for (const [k, sn] of sentences.entries()) { acc += sn.length + 1; if (pos < acc) return k; }
+    return sentences.length - 1;
+  };
+  for (const a of answers) {
+    if (used.length >= maxBlanks) break;
+    const at = passage.indexOf(a, from);
+    if (at < 0) continue;                                            // 앞 빈칸과 겹치면 건너뜀
+    const k = sentenceAt(at);
+    if (sentences.length > 1 && sentOf.includes(k)) continue;        // 같은 문장 두 번째 빈칸은 건너뜀
+    sentOf.push(k); used.push(a); from = at + a.length;
   }
+  if (!used.length) return null;
+  // 뒤에서부터 바꿔야 앞쪽 위치가 안 밀린다
+  const spots = used.map((a, i) => ({ a, i, at: -1 }));
+  let cursor = 0;
+  for (const sp of spots) { sp.at = passage.indexOf(sp.a, cursor); cursor = sp.at + sp.a.length; }
+  for (const sp of [...spots].reverse()) text = text.slice(0, sp.at) + `( ${SYMBOLS[sp.i]} )` + text.slice(sp.at + sp.a.length);
   const n = used.length;
   const desc = String(r.source_desc ?? "").trim() || `${subject} 관련 자료`;
   const stem =
