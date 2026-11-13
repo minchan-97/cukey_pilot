@@ -23,10 +23,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     await sb.from("problems").update({ revealed_at: new Date().toISOString() }).eq("id", p.id);
   }
   if (!answer) {
-    for (let i = 0; i < 2 && !answer; i++) {
+    for (let i = 0; i < 3 && !answer; i++) {
       const r = await llmJSON<any>(answerPrompt(subject, p.stem, grounding), 0.2);
-      const chk = checkCites(r.cites, grounding);
-      const sup = checkSupport(`${r.model_answer ?? ""} ${r.explanation ?? ""}`, grounding);
+      // 인용을 빼먹으면 준 근거 전체로 본다(근거 밖 인용은 여전히 거부)
+      const chk = checkCites(Array.isArray(r.cites) && r.cites.length ? r.cites : grounding.map((g) => g.id), grounding);
+      // 해설이 문제 속 상황(교사·학생 장면 등)을 다시 말하는 건 지어낸 게 아니므로 발문도 함께 대조
+      const sup = checkSupport(`${r.model_answer ?? ""} ${r.explanation ?? ""}`, grounding, 0.6, p.stem);
       if (chk.ok && sup.ok && r.model_answer) answer = { model_answer: r.model_answer, explanation: r.explanation ?? "", cites: chk.cites };
     }
     if (!answer) return fail("근거에 없는 내용이 섞여 해설을 내지 않았어요. 다시 눌러 보고, 계속 안 되면 새 문제를 만들어 주세요.", 422);
