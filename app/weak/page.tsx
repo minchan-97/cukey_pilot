@@ -10,9 +10,9 @@ export default function Weak() {
   const load = () => fetch("/api/weak").then((r) => r.json()).then((d) => setItems(Array.isArray(d) ? d : []));
   useEffect(() => { load(); }, []);
 
-  async function makeProblem(id: string) {
-    setBusy(id); setMsg("");
-    const r = await fetch("/api/problems", { method: "POST", body: JSON.stringify({ concept_id: id }) });
+  async function makeProblem(id: string, type: "blank" | "case") {
+    setBusy(id + type); setMsg("");
+    const r = await fetch("/api/problems", { method: "POST", body: JSON.stringify({ concept_id: id, type }) });
     const d = await r.json();
     setBusy("");
     r.ok ? router.push(`/problem/${d.id}`) : setMsg(d.error);
@@ -39,7 +39,8 @@ export default function Weak() {
               <div className="muted">{c.book_title}, {c.why.join(", ")}</div>
             </div>
             <button className="ghost" onClick={() => rename(c.id, c.name)}>이름</button>
-            <button onClick={() => makeProblem(c.id)} disabled={!!busy}>{busy === c.id ? "만드는 중" : "문제 풀기"}</button>
+            <button onClick={() => makeProblem(c.id, "blank")} disabled={!!busy}>{busy === c.id + "blank" ? "만드는 중" : "빈칸형"}</button>
+            <button onClick={() => makeProblem(c.id, "case")} disabled={!!busy}>{busy === c.id + "case" ? "만드는 중" : "사례형"}</button>
           </li>
         ))}
         {items && !items.length && <li className="muted">교재에서 모르는 부분을 표시하면 여기에 쌓여요.</li>}
