@@ -10,7 +10,7 @@ const VERBISH = /(하다|하고|하며|하여|해서|한다|된다|되며|되고
 export type Candidate = { term: string; score: number };
 
 // 명사 뒤 '하다/되다' 꼴(범주화한, 정당화하는) → 앞의 명사는 살린다
-const LIGHT = ["하는", "하고", "하며", "하여", "해서", "하기", "하게", "하지", "한다", "되는", "되고", "되며", "되어", "돼서",
+const LIGHT = ["함으로써", "됨으로써", "하거나", "되거나", "하도록", "되도록", "하여야", "하면", "되면", "하는", "하고", "하며", "하여", "해서", "하기", "하게", "하지", "한다", "되는", "되고", "되며", "되어", "돼서",
   "되기", "되게", "되지", "된다", "함", "한", "할", "됨", "된", "될"].sort((a, b) => b.length - a.length);
 // 그 밖의 서술어 끝 → 동사·형용사라 빈칸 후보에서 뺀다
 const PRED = ["는다", "있다", "없다", "으며", "적으로", "히는", "히고", "히며", "히여", "리는", "기는", "우는", "다"];
@@ -55,4 +55,48 @@ export function blankCandidates(passage: string, concept: string, ground: string
   });
   return [...pool.entries()].map(([term, score]) => ({ term, score }))
     .sort((a, b) => b.score - a.score || b.term.length - a.term.length).slice(0, limit);
+}
+
+/**
+ * 표시한 부분이 짧으면 같은 쪽 원문에서 앞뒤 문장을 붙여 제시문을 넉넉하게 만든다.
+ * 표시한 글이 원문에서 안 찾아지면(이미지 판독 등) 낱말이 가장 많이 겹치는 문장을 중심으로 잡는다.
+ */
+export function expandPassage(marked: string, pageText: string, minLen = 90, maxLen = 420): string {
+  const one = (s: string) => s.replace(/\s+/g, " ").trim();
+  const mark = one(marked);
+  const page = one(pageText);
+  if (!page || mark.length >= minLen) return mark;
+  const sents = page.split(/(?<=[.?!])\s+/).map((s) => s.trim()).filter((s) => s.length > 4);
+  if (!sents.length) return mark;
+
+  // 표시한 글이 걸친 문장들 찾기
+  const at = page.indexOf(mark);
+  let lo = -1, hi = -1;
+  if (at >= 0) {
+    let pos = 0;
+    sents.forEach((s, k) => {
+      const start = page.indexOf(s, pos), end = start + s.length;
+      pos = end;
+      if (end > at && start < at + mark.length) { if (lo < 0) lo = k; hi = k; }
+    });
+  }
+  if (lo < 0) {
+    // 못 찾으면 겹치는 낱말이 가장 많은 문장
+    const want = new Set(mark.split(" ").filter((w) => w.length >= 2));
+    let best = -1, bestScore = 0;
+    sents.forEach((s, k) => {
+      const sc = s.split(" ").filter((w) => want.has(w)).length;
+      if (sc > bestScore) { best = k; bestScore = sc; }
+    });
+    if (best < 0) return mark;
+    lo = hi = best;
+  }
+  // 짧으면 뒤 문장 → 앞 문장 순으로 붙인다
+  const len = () => sents.slice(lo, hi + 1).join(" ").length;
+  while (len() < minLen) {
+    if (hi + 1 < sents.length && len() + sents[hi + 1].length <= maxLen) hi++;
+    else if (lo > 0 && len() + sents[lo - 1].length <= maxLen) lo--;
+    else break;
+  }
+  return sents.slice(lo, hi + 1).join(" ");
 }
