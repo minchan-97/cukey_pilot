@@ -39,9 +39,9 @@ export default function Weak() {
               <div className="muted">{c.book_title}, {c.why.join(", ")}</div>
             </div>
             <button className="ghost" onClick={() => rename(c.id, c.name)}>이름</button>
-            <button onClick={() => makeProblem(c.id, "blank")} disabled={!!busy}>{busy === c.id + "blank" ? "만드는 중" : "빈칸형"}</button>
-            <button onClick={() => makeProblem(c.id, "case")} disabled={!!busy}>{busy === c.id + "case" ? "만드는 중" : "사례형"}</button>
             <button onClick={() => makeProblem(c.id, "essay")} disabled={!!busy}>{busy === c.id + "essay" ? "만드는 중" : "서술형"}</button>
+            <button className="ghost" onClick={() => makeProblem(c.id, "blank")} disabled={!!busy}>{busy === c.id + "blank" ? "만드는 중" : "빈칸형"}</button>
+            <button className="ghost" onClick={() => makeProblem(c.id, "case")} disabled={!!busy}>{busy === c.id + "case" ? "만드는 중" : "사례형"}</button>
           </li>
         ))}
         {items && !items.length && <li className="muted">교재에서 모르는 부분을 표시하면 여기에 쌓여요.</li>}
