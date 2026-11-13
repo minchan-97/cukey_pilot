@@ -20,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <nav className="top">
           <Link href="/" className="brand">임용 D</Link>
           <Link href="/weak">약한 개념</Link>
+          <Link href="/problems">만든 문제</Link>
           <Link href="/report">강사용</Link>
         </nav>
         <main>{children}</main>
