@@ -4,7 +4,7 @@ import { gatherGrounding, type Grounding } from "@/lib/retrieve";
 import { blankPrompt, casePrompt } from "@/lib/prompts";
 import { checkCites, checkSupport, readable } from "@/lib/guard";
 import { cleanText } from "@/lib/clean";
-import { blankCandidates } from "@/lib/blanks";
+import { blankCandidates, expandPassage } from "@/lib/blanks";
 
 const SYMBOLS = ["㉠", "㉡", "㉢", "㉣"];
 const squash = (s: string) => s.replace(/[\s·.,'"‘’“”()<>]/g, "");
@@ -124,9 +124,11 @@ export async function POST(req: Request) {
     .filter((g) => readable(g.text));
   if (!grounding.length) return fail("이 쪽 본문이 깨져 있어 근거로 쓸 수 없어요. 교재를 다시 올리거나 다른 쪽을 표시해 주세요.");
 
-  const passage = marked[0].replace(/[ \t]+/g, " ").trim();
+  // 표시가 짧으면 같은 쪽 원문에서 앞뒤 문장을 붙여 제시문을 만든다
+  const pageText = clean.find((p) => p.page_no === marks[0].page_no)?.text ?? "";
+  const passage = expandPassage(marked[0], pageText);
   if (kind === "blank" && passage.replace(/\s/g, "").length < 15) {
-    return fail("빈칸형을 만들기엔 표시한 부분이 짧아요. 한두 문장 이상 표시하거나 사례형으로 만들어 보세요.");
+    return fail("이 쪽에서 빈칸형 제시문을 만들 원문이 부족해요. 사례형으로 만들어 보세요.");
   }
 
   for (let attempt = 0; attempt < 3; attempt++) {
