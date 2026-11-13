@@ -61,6 +61,7 @@ export function cleanText(s: unknown): string {
     .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
     .replace(/\uFFFE|\uFFFF/g, "")
+    .replace(/[\uE000-\uF8FF]/g, "")            // 글꼴 전용 영역 문자(□로 보이는 글머리표 등)
     .replace(/[ \t]{2,}/g, " ")
     .replace(/ +\n/g, "\n")
     .trim();
