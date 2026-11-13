@@ -1,9 +1,9 @@
 import { db, userId, json, fail } from "@/lib/db";
 import { llmJSON } from "@/lib/llm";
-import { gatherGrounding, type Grounding } from "@/lib/retrieve";
-import { blankPrompt, casePrompt } from "@/lib/prompts";
+import { gatherGrounding, conceptGrounding, type Grounding } from "@/lib/retrieve";
+import { blankPrompt, casePrompt, essayPrompt } from "@/lib/prompts";
 import { checkCites, checkSupport, readable } from "@/lib/guard";
-import { cleanText } from "@/lib/clean";
+import { cleanText, looksBroken } from "@/lib/clean";
 import { blankCandidates, expandPassage } from "@/lib/blanks";
 
 const SYMBOLS = ["㉠", "㉡", "㉢", "㉣"];
@@ -105,7 +105,7 @@ async function buildCase(subject: string, concept: string, marked: string[], g: 
 // 약한 개념 → 임용형 문항 1세트(빈칸형 또는 사례형). 정답은 함께 만들되 답을 내기 전엔 숨긴다.
 export async function POST(req: Request) {
   const { concept_id, type } = await req.json();
-  const kind: "blank" | "case" = type === "case" ? "case" : "blank";
+  const kind: "blank" | "case" | "essay" = type === "case" ? "case" : type === "essay" ? "essay" : "blank";
   const sb = db();
   const user = userId();
   const { data: concept } = await sb.from("concepts")
@@ -120,6 +120,24 @@ export async function POST(req: Request) {
 
   const marked = marks.map((m) => cleanText(m.text));
   const clean = (pages ?? []).map((p) => ({ page_no: p.page_no, text: cleanText(p.text) }));
+
+  // ── v17식 서술형: 개념 단위의 깨끗한 문장만 근거로, 자유롭게 출제. 해설은 답을 낸 뒤 검증하며 만든다
+  if (kind === "essay") {
+    const g = conceptGrounding(`${concept.name} ${marked.join(" ")}`, marks[0].page_no, clean, book.title,
+      (s) => readable(s) && !looksBroken(s));
+    if (!g.length) return fail("이 개념과 관련된 깨끗한 원문 문장을 찾지 못했어요. 빈칸형이나 사례형으로 만들어 보세요.");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r = await llmJSON<{ stem: string }>(essayPrompt(book.subject, concept.name, marked, g), 0.7);
+      const stem = String(r.stem ?? "").trim();
+      if (!stem || /모범답안|정답\s*[:：]|해설\s*[:：]/.test(stem)) continue;
+      const ins = await sb.from("problems").insert({
+        user_id: user, concept_id, stem, grounding: g, stem_cites: g.map((x) => x.id),
+      }).select("id").single();
+      if (ins.error) return fail(ins.error.message, 500);
+      return json({ id: ins.data.id, stem });
+    }
+    return fail("서술형 문제를 만들지 못했어요. 다시 눌러 주세요.", 422);
+  }
   const grounding = gatherGrounding(`${concept.name} ${marked.join(" ")}`, marks[0].page_no, clean, book.title)
     .filter((g) => readable(g.text));
   if (!grounding.length) return fail("이 쪽 본문이 깨져 있어 근거로 쓸 수 없어요. 교재를 다시 올리거나 다른 쪽을 표시해 주세요.");
