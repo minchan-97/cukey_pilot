@@ -11,13 +11,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const sb = db();
   const user = userId();
   const { data: p } = await sb.from("problems")
-    .select("id, stem, grounding, answer, concepts(books(subject))")
+    .select("id, stem, grounding, answer, revealed_at, concepts(books(subject))")
     .eq("id", params.id).eq("user_id", user).single();
   if (!p) return fail("문제를 찾을 수 없어요.", 404);
   const subject = (p.concepts as any)?.books?.subject ?? "";
   const grounding = p.grounding as Grounding[];
 
   let answer = p.answer as any;
+  // 임용형 문항은 정답을 미리 만들어 둔다 → 지금 처음 여는 것으로 기록만
+  if (answer && !p.revealed_at) {
+    await sb.from("problems").update({ revealed_at: new Date().toISOString() }).eq("id", p.id);
+  }
   if (!answer) {
     for (let i = 0; i < 2 && !answer; i++) {
       const r = await llmJSON<any>(answerPrompt(subject, p.stem, grounding), 0.2);
