@@ -2,7 +2,25 @@ import { db, userId, json, fail } from "@/lib/db";
 import { llmJSON } from "@/lib/llm";
 import { answerPrompt, gradePrompt } from "@/lib/prompts";
 import { checkCites, checkSupport } from "@/lib/guard";
-import type { Grounding } from "@/lib/retrieve";
+import { keywords, type Grounding } from "@/lib/retrieve";
+
+export const maxDuration = 120;
+
+/** AI 해설이 검사를 못 넘으면: 문제와 가장 관련 깊은 원문 문장을 그대로 모범답안으로 보여준다(지어낸 말 0%) */
+function excerptAnswer(stem: string, g: Grounding[]) {
+  const want = new Set(keywords(stem, 20));
+  const sents = g.flatMap((x) => x.text.split(/(?<=[.?!])\s+/).map((t) => ({ id: x.id, t: t.trim() })))
+    .filter((x) => x.t.length >= 10)
+    .map((x) => ({ ...x, sc: keywords(x.t, 30).filter((w) => want.has(w)).length }))
+    .sort((a, b) => b.sc - a.sc).slice(0, 2);
+  if (!sents.length) return null;
+  return {
+    model_answer: sents.map((x) => x.t).join(" "),
+    explanation: "AI 해설이 교재 근거와 충분히 일치하지 않아, 교재 원문에서 답이 되는 부분을 그대로 보여드려요.",
+    cites: [...new Set(sents.map((x) => x.id))],
+    excerpt: true,
+  };
+}
 
 // 내 답을 내야만 해설이 열린다(인출연습 강제). 해설 생성 → 채점 '제안'까지.
 export async function POST(req: Request, { params }: { params: { id: string } }) {
@@ -31,7 +49,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       const sup = checkSupport(`${r.model_answer ?? ""} ${r.explanation ?? ""}`, grounding, 0.6, p.stem);
       if (chk.ok && sup.ok && r.model_answer) answer = { model_answer: r.model_answer, explanation: r.explanation ?? "", cites: chk.cites };
     }
-    if (!answer) return fail("근거에 없는 내용이 섞여 해설을 내지 않았어요. 다시 눌러 보고, 계속 안 되면 새 문제를 만들어 주세요.", 422);
+    if (!answer) answer = excerptAnswer(p.stem, grounding);
+    if (!answer) return fail("근거에 없는 내용이 섞여 해설을 내지 않았어요. 새 문제를 만들어 주세요.", 422);
     await sb.from("problems").update({ answer, revealed_at: new Date().toISOString() }).eq("id", p.id);
   }
 
