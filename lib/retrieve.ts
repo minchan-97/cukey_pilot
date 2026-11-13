@@ -64,3 +64,38 @@ export function gatherGrounding(
   for (const { p } of scored.slice(0, k - out.length)) out.push(make(p));
   return out;
 }
+
+/**
+ * v17 방식 근거: 쪽 통째가 아니라 '개념과 관련된 깨끗한 문장'만 짧게 모은다.
+ * 표시한 쪽 문장에 가산점, 교재 전체에서 낱말이 겹치는 문장을 골라 쪽별로 묶는다.
+ */
+export function conceptGrounding(
+  query: string, anchorPage: number, pages: PageRow[], bookTitle: string,
+  ok: (s: string) => boolean, maxSentences = 6
+): Grounding[] {
+  const want = new Set(keywords(query, 16));
+  const picked: { page_no: number; s: string; score: number; order: number }[] = [];
+  let order = 0;
+  for (const p of pages) {
+    const sents = p.text.replace(/\s+/g, " ").split(/(?<=[.?!])\s+/);
+    for (const raw of sents) {
+      const s = raw.trim();
+      order++;
+      if (s.length < 15 || s.length > 260 || !ok(s)) continue;
+      const have = new Set(keywords(s, 30));
+      let score = 0;
+      for (const w of want) if (have.has(w)) score += 1;
+      if (score === 0) continue;
+      if (p.page_no === anchorPage) score += 1.5;
+      else if (Math.abs(p.page_no - anchorPage) <= 2) score += 0.5;
+      picked.push({ page_no: p.page_no, s, score, order });
+    }
+  }
+  const top = picked.sort((a, b) => b.score - a.score).slice(0, maxSentences)
+    .sort((a, b) => a.order - b.order);                     // 원문 순서대로 다시
+  const byPage = new Map<number, string[]>();
+  for (const t of top) byPage.set(t.page_no, [...(byPage.get(t.page_no) ?? []), t.s]);
+  return [...byPage.entries()].map(([page_no, ss]) => ({
+    id: `p${page_no}`, page_no, source: `${bookTitle} p.${page_no}`, text: ss.join(" "),
+  }));
+}
