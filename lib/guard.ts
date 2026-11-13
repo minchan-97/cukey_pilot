@@ -23,7 +23,8 @@ const GLUE = new Set(
 
 export function checkSupport(text: string, grounding: Grounding[], min = 0.6) {
   const ground = grounding.map((g) => g.text).join("\n");
-  const words = [...new Set(tokenize(text).filter((w) => w.length >= 2 && w !== "NUM" && !GLUE.has(w)))];
+  // [p14] 같은 근거 표시는 낱말이 아니므로 빼고 센다
+  const words = [...new Set(tokenize(text.replace(/\[[^\]]*\]/g, " ")).filter((w) => w.length >= 2 && w !== "NUM" && !GLUE.has(w)))];
   if (!words.length) return { ok: false, ratio: 0, missing: [] as string[] };
   // 활용형 차이를 줄이려고 끝 한 글자는 비워 두고 찾는다
   const found = (w: string) => ground.includes(w.length > 2 ? w.slice(0, -1) : w);
