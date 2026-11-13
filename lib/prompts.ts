@@ -94,3 +94,17 @@ export function casePrompt(subject: string, concept: string, marked: string[], g
     `출력(JSON): {"lead": "", "passage": "", "items": [{"ask": "㉠…쓰시오.", "answer": ""}], "explanation": "", "cites": ["p11"]}`
   );
 }
+
+// v17 방식 서술형: 개념 단위로 모은 깨끗한 근거 + 자유로운 출제. 해설은 답을 낸 뒤 따로 만든다.
+export function essayPrompt(subject: string, concept: string, marked: string[], g: Grounding[]) {
+  return (
+    `너는 초등 임용시험 ${subject} 문제 출제 보조자다.\n` +
+    `수험생이 약하다고 표시한 개념 '${concept}'에 대해, 아래 '근거 자료'의 개념 범위 안에서만 기출과 유사한 서술형 연습문제 1개를 낸다.\n` +
+    `- 임용 서술형처럼 짧은 상황이나 제시문을 주고, 요구 사항 1~2가지를 '~쓰시오.'로 묻는다.\n` +
+    `- 근거에 없는 내용을 지어내지 말 것. 답이 근거 자료 안에서 나와야 한다.\n` +
+    `- 해설·정답은 절대 쓰지 말고 문제(발문)만 출력한다.\n\n` +
+    `[수험생이 표시한 부분]\n${marked.map((m) => `- ${m}`).join("\n")}\n\n` +
+    `[근거 자료]\n${grounds(g)}\n\n` +
+    `출력(JSON): {"stem": "문제"}`
+  );
+}
