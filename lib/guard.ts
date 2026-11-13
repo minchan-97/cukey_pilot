@@ -21,8 +21,9 @@ const GLUE = new Set(
    "따른 관련 바탕 근거 내용 제시 측면 과정 방법 이유 의미 바탕으로 수험생").split(" ")
 );
 
-export function checkSupport(text: string, grounding: Grounding[], min = 0.6) {
-  const ground = grounding.map((g) => g.text).join("\n");
+/** extra: 문제 발문처럼, 해설이 다시 언급해도 되는 글(지어낸 내용이 아니라 문제에 이미 있는 말) */
+export function checkSupport(text: string, grounding: Grounding[], min = 0.6, extra = "") {
+  const ground = grounding.map((g) => g.text).join("\n") + "\n" + extra;
   // [p14] 같은 근거 표시는 낱말이 아니므로 빼고 센다
   const words = [...new Set(tokenize(text.replace(/\[[^\]]*\]/g, " ")).filter((w) => w.length >= 2 && w !== "NUM" && !GLUE.has(w)))];
   if (!words.length) return { ok: false, ratio: 0, missing: [] as string[] };
