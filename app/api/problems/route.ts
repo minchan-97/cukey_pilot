@@ -6,6 +6,8 @@ import { checkCites, checkSupport, readable } from "@/lib/guard";
 import { cleanText, looksBroken } from "@/lib/clean";
 import { blankCandidates, expandPassage } from "@/lib/blanks";
 
+export const maxDuration = 120;
+
 const SYMBOLS = ["㉠", "㉡", "㉢", "㉣"];
 const squash = (s: string) => s.replace(/[\s·.,'"‘’“”()<>]/g, "");
 const groundText = (g: Grounding[]) => squash(g.map((x) => x.text).join(""));
@@ -123,9 +125,12 @@ export async function POST(req: Request) {
 
   // ── v17식 서술형: 개념 단위의 깨끗한 문장만 근거로, 자유롭게 출제. 해설은 답을 낸 뒤 검증하며 만든다
   if (kind === "essay") {
-    const g = conceptGrounding(`${concept.name} ${marked.join(" ")}`, marks[0].page_no, clean, book.title,
-      (s) => readable(s) && !looksBroken(s));
-    if (!g.length) return fail("이 개념과 관련된 깨끗한 원문 문장을 찾지 못했어요. 빈칸형이나 사례형으로 만들어 보세요.");
+    let g = conceptGrounding(`${concept.name} ${marked.join(" ")}`, marks[0].page_no, clean, book.title,
+      (s) => !looksBroken(s) && /[가-힣]/.test(s));
+    if (!g.length) {                                               // 깨끗한 문장이 없으면 쪽 단위 근거로
+      g = gatherGrounding(`${concept.name} ${marked.join(" ")}`, marks[0].page_no, clean, book.title).filter((x) => readable(x.text));
+    }
+    if (!g.length) return fail("이 쪽 본문이 깨져 있어 근거로 쓸 수 없어요. 다른 쪽을 표시해 주세요.");
     for (let attempt = 0; attempt < 2; attempt++) {
       const r = await llmJSON<{ stem: string }>(essayPrompt(book.subject, concept.name, marked, g), 0.7);
       const stem = String(r.stem ?? "").trim();
