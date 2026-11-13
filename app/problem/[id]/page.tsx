@@ -55,7 +55,7 @@ export default function Problem({ params }: { params: { id: string } }) {
       {answer && (
         <>
           {res && <><h2>내 답</h2><div className="serif">{mine}</div></>}
-          <h2>모범답안</h2>
+          <h2>모범답안{answer.excerpt ? " (교재 원문)" : ""}</h2>
           <div className="serif">{answer.model_answer}</div>
           <h2>해설</h2>
           <div className="serif">{answer.explanation}</div>
