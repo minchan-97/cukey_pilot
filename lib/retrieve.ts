@@ -71,7 +71,7 @@ export function gatherGrounding(
  */
 export function conceptGrounding(
   query: string, anchorPage: number, pages: PageRow[], bookTitle: string,
-  ok: (s: string) => boolean, maxSentences = 6
+  ok: (s: string) => boolean, maxSentences = 8
 ): Grounding[] {
   const want = new Set(keywords(query, 16));
   const picked: { page_no: number; s: string; score: number; order: number }[] = [];
