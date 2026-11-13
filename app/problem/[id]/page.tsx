@@ -11,6 +11,7 @@ export default function Problem({ params }: { params: { id: string } }) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<any>(null);
   const [err, setErr] = useState("");
+  const [retry, setRetry] = useState(false);
 
   useEffect(() => {
     fetch(`/api/problems/${params.id}`).then(async (r) => {
@@ -35,7 +36,7 @@ export default function Problem({ params }: { params: { id: string } }) {
 
   if (err && !p) return <p className="err">{err}</p>;
   if (!p) return <p className="muted">문제 여는 중</p>;
-  const answer = res?.answer ?? p.answer;
+  const answer = res?.answer ?? (retry ? null : p.answer);
   const grounding = res?.grounding ?? p.grounding;
 
   return (
@@ -47,11 +48,14 @@ export default function Problem({ params }: { params: { id: string } }) {
         <>
           <label htmlFor="mine">내 답</label>
           <textarea id="mine" value={mine} onChange={(e) => setMine(e.target.value)} placeholder="먼저 써 보고 해설을 열어요." />
-          <p><button onClick={reveal} disabled={busy || !mine.trim()}>{busy ? "해설 만드는 중" : "답 내고 해설 보기"}</button></p>
+          <p><button onClick={reveal} disabled={busy || !mine.trim()}>{busy ? (p.revealed ? "채점 중" : "해설 만드는 중") : "답 내고 해설 보기"}</button></p>
         </>
       )}
       {err && <p className="err" role="alert">{err}</p>}
 
+      {answer && !res && (
+        <p><button className="ghost" onClick={() => { setRetry(true); setMine(""); setDone(null); setErr(""); }}>다시 풀기</button></p>
+      )}
       {answer && (
         <>
           {res && <><h2>내 답</h2><div className="serif">{mine}</div></>}
